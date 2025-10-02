@@ -1,0 +1,109 @@
+# Pickleball Analysis Pipeline Configuration
+
+# Court specifications (official pickleball court dimensions)
+court:
+  width_meters: 13.41  # Court width in meters
+  height_meters: 6.1   # Court height in meters
+  net_height_meters: 0.914  # Net height
+  
+# Video processing settings
+video:
+  fps: 30  # Frames per second for output
+  resolution:
+    width: 1920
+    height: 1080
+  input_videos:
+    - "../data_video/san1.mp4"  # Camera 1 (top-left)
+    - "../data_video/san2.mp4"  # Camera 2 (top-right) 
+    - "../data_video/san3.mp4"  # Camera 3 (bottom-left)
+    - "../data_video/san4.mp4"  # Camera 4 (bottom-right)
+
+# YOLO Detection settings
+detection:
+  model: "yolov8x.pt"  # Model weights file
+  confidence_threshold: 0.5
+  iou_threshold: 0.45
+  classes:
+    player: 0
+    ball: 32  # Sports ball class in COCO dataset
+  device: "cuda"  # "cuda" or "cpu"
+  
+# Tracking settings  
+tracking:
+  algorithm: "bytetrack"  # "bytetrack", "deepsort", "ocsort"
+  max_disappeared: 30  # Max frames before removing track
+  max_distance: 100   # Max distance for association
+  min_hits: 3        # Min detections before confirming track
+  
+  # ByteTrack specific settings
+  bytetrack:
+    track_thresh: 0.6
+    track_buffer: 30
+    match_thresh: 0.8
+    
+# Analysis settings
+analysis:
+  smoothing:
+    enabled: true
+    window_size: 5  # Moving average window
+  velocity:
+    calculation_method: "finite_difference"  # "finite_difference" or "kalman"
+    min_distance_threshold: 0.1  # Minimum distance to calculate velocity (meters)
+  
+# Visualization settings
+visualization:
+  colors:
+    player_1: [255, 0, 0]    # Red
+    player_2: [0, 255, 0]    # Green  
+    player_3: [0, 0, 255]    # Blue
+    player_4: [255, 255, 0]  # Yellow
+    ball: [255, 0, 255]      # Magenta
+    
+  heatmap:
+    bins: 50
+    alpha: 0.7
+    colormap: "hot"
+    
+  trajectory:
+    line_width: 2
+    point_size: 3
+    history_length: 100  # Number of points to show in trajectory
+    
+  charts:
+    dpi: 300
+    figsize: [12, 8]
+    
+# Output settings
+output:
+  base_dir: "output"
+  subdirs:
+    videos: "processed_videos"
+    data: "tracking_data" 
+    heatmaps: "heatmaps"
+    charts: "charts"
+    reports: "reports"
+    
+  formats:
+    video: "mp4"
+    data: "csv"
+    images: "png"
+    reports: "json"
+
+# Logging settings
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level} | {name} | {message}"
+  file_rotation: "1 week"
+  file_retention: "1 month"
+  
+# Performance settings
+performance:
+  batch_size: 1
+  num_workers: 4
+  memory_limit_gb: 8
+  
+# Debug settings
+debug:
+  save_intermediate_frames: false
+  verbose_tracking: false
+  show_detection_boxes: true

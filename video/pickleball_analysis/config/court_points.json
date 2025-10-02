@@ -1,0 +1,198 @@
+{
+  "description": "Toạ độ 4 góc sân pickleball cho mỗi camera (pixel coordinates)",
+  "court_dimensions": {
+    "width_meters": 13.41,
+    "height_meters": 6.1,
+    "description": "Kích thước thực của sân pickleball"
+  },
+  "cameras": {
+    "san1": {
+      "description": "Camera san1 (simple calibration)",
+      "court_corners": {
+        "top_left": [
+          194,
+          127
+        ],
+        "top_right": [
+          608,
+          15
+        ],
+        "bottom_right": [
+          912,
+          90
+        ],
+        "bottom_left": [
+          1083,
+          147
+        ]
+      },
+      "calibration_status": "calibrated",
+      "calibration_method": "simple_multi_point",
+      "points_used": 11,
+      "detailed_points": {
+        "Top-Left Corner": [
+          194,
+          127
+        ],
+        "Top-Right Corner": [
+          608,
+          15
+        ],
+        "Bottom-Right Corner": [
+          912,
+          90
+        ],
+        "Bottom-Left Corner": [
+          1083,
+          147
+        ],
+        "Net Left": [
+          1248,
+          201
+        ],
+        "Net Right": [
+          1571,
+          331
+        ],
+        "Net Center": [
+          1317,
+          475
+        ],
+        "Service Line Top-Left": [
+          816,
+          749
+        ],
+        "Service Line Top-Right": [
+          605,
+          559
+        ],
+        "Service Line Bottom-Left": [
+          485,
+          443
+        ],
+        "Service Line Bottom-Right": [
+          394,
+          347
+        ]
+      },
+      "homography_matrix": [
+        [
+          2.4763314301058648,
+          10.830961914033017,
+          -1666.9052215096035
+        ],
+        [
+          0.9511080205627751,
+          5.203113352833873,
+          -656.2751127859514
+        ],
+        [
+          -0.0022689365747285417,
+          0.0253612478406291,
+          1.0
+        ]
+      ],
+      "notes": "Simple calibration with 11 points"
+    },
+    "san2": {
+      "description": "Camera góc 2 (top-right view)",
+      "court_corners": {
+        "top_left": [
+          0,
+          0
+        ],
+        "top_right": [
+          0,
+          0
+        ],
+        "bottom_left": [
+          0,
+          0
+        ],
+        "bottom_right": [
+          0,
+          0
+        ]
+      },
+      "calibration_status": "not_calibrated",
+      "notes": "Cần hiệu chỉnh bằng cách chạy court_detection.py --calibrate"
+    },
+    "san3": {
+      "description": "Camera góc 3 (bottom-left view)",
+      "court_corners": {
+        "top_left": [
+          0,
+          0
+        ],
+        "top_right": [
+          0,
+          0
+        ],
+        "bottom_left": [
+          0,
+          0
+        ],
+        "bottom_right": [
+          0,
+          0
+        ]
+      },
+      "calibration_status": "not_calibrated",
+      "notes": "Cần hiệu chỉnh bằng cách chạy court_detection.py --calibrate"
+    },
+    "san4": {
+      "description": "Camera góc 4 (bottom-right view)",
+      "court_corners": {
+        "top_left": [
+          0,
+          0
+        ],
+        "top_right": [
+          0,
+          0
+        ],
+        "bottom_left": [
+          0,
+          0
+        ],
+        "bottom_right": [
+          0,
+          0
+        ]
+      },
+      "calibration_status": "not_calibrated",
+      "notes": "Cần hiệu chỉnh bằng cách chạy court_detection.py --calibrate"
+    }
+  },
+  "target_court": {
+    "description": "Toạ độ sân chuẩn (bird's-eye view) trong pixel",
+    "width_pixels": 1341,
+    "height_pixels": 610,
+    "corners": {
+      "top_left": [
+        0,
+        0
+      ],
+      "top_right": [
+        1341,
+        0
+      ],
+      "bottom_left": [
+        0,
+        610
+      ],
+      "bottom_right": [
+        1341,
+        610
+      ]
+    },
+    "scale": "10 pixels = 1 meter"
+  },
+  "calibration_instructions": {
+    "step_1": "Chạy 'python src/court_detection.py --calibrate'",
+    "step_2": "Click vào 4 góc sân theo thứ tự: top-left, top-right, bottom-left, bottom-right",
+    "step_3": "Nhấn 's' để save, 'q' để quit, 'r' để reset",
+    "step_4": "Lặp lại cho tất cả 4 video",
+    "step_5": "Kiểm tra kết quả homography transformation"
+  }
+}
