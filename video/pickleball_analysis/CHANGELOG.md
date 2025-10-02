@@ -1,197 +1,121 @@
-# Changelog - Pickleball Video Analysis Pipeline
+# CHANGELOG - Pickleball Analysis Project
 
-Tất cả thay đổi quan trọng của project này sẽ được ghi lại trong file này.
+## Version 2.0.0 - October 2, 2025 🎯
 
-Format dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-và project này tuân theo [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+### 🔥 Major Updates - FIXED COURT TRACKING
 
-## [Unreleased]
+#### ✅ New Features
+- **`corrected_tracking_san4.py`** - Main script với court orientation đã fix
+- **`recalibrate_court.py`** - Interactive court calibration tool
+- **Net orientation fixed** - Net nằm ngang theo chiều rộng sân (đúng)
+- **Proper camera zones** - Near camera vs Far camera zones
+- **Enhanced ball tracking** - Ball có thể di chuyển qua lại 2 sân
+- **Court boundary visualization** - Hiển thị trực tiếp trên video
 
-### Planned Features
-- [ ] Real-time video stream processing
-- [ ] Advanced tracking algorithms (ByteTrack, OC-SORT)
-- [ ] Custom YOLO model training for pickleball
-- [ ] Multi-camera fusion
-- [ ] Web interface for interactive analysis
-- [ ] Mobile app support
-- [ ] Cloud deployment options
+#### 🛠️ Fixed Issues
+- ❌ **FIXED**: Net direction (was vertical, now horizontal)
+- ❌ **FIXED**: Player zone assignment (Near/Far camera instead of Left/Right)
+- ❌ **FIXED**: Court boundary detection accuracy
+- ❌ **FIXED**: Ball tracking across court sides
+- ❌ **FIXED**: Player assignment logic for far camera players
 
-## [1.0.0] - 2025-10-02
+#### 🚀 Performance Improvements  
+- GPU acceleration với CUDA support
+- YOLOv8n model cho tốc độ cao
+- Optimized frame processing với skip frames
+- Memory usage optimization
 
-### Added - Initial Release 🎉
-
-#### Core Pipeline
-- **Complete video analysis pipeline** từ raw video đến insights
-- **4-camera support** với court detection và homography transformation
-- **YOLOv11x object detection** cho players và ball
-- **Multi-object tracking** với unique ID assignment
-- **Movement analysis** với speed, distance, acceleration calculations
-- **Comprehensive visualizations** including heatmaps, trajectories, charts
-
-#### Modules
-- `court_detection.py` - Court calibration và homography transformation
-- `detection.py` - YOLO-based object detection
-- `tracking.py` - Multi-object tracking với centroid-based algorithm
-- `analysis.py` - Movement analysis và performance metrics
-- `visualization.py` - Charts, heatmaps, interactive dashboards
-- `utils.py` - Core utility functions và helpers
-
-#### Configuration System
-- **YAML-based configuration** với comprehensive settings
-- **Court calibration system** với manual point selection
-- **Flexible parameter tuning** cho detection, tracking, analysis
-- **Device auto-detection** (GPU/CPU) với fallback options
-
-#### Output Formats
-- **CSV tracking data** với detailed frame-by-frame information
-- **JSON analysis results** với structured performance metrics
-- **PNG/HTML visualizations** including heatmaps và charts
-- **Interactive dashboard** với Plotly
-- **Annotated video output** với tracking overlays
-
-#### Documentation
-- **Complete installation guide** với multiple OS support
-- **Detailed usage guide** với examples và troubleshooting
-- **Technical specifications** với architecture details
-- **API documentation** cho all modules
-
-#### Development Tools
-- **Demo script** với synthetic data generation
-- **Setup script** cho automated installation
-- **Makefile** với convenient commands
-- **Testing framework** với validation scripts
-
-#### Analysis Features
-- **Player movement tracking** với position, velocity, acceleration
-- **Court zone analysis** với coverage percentages
-- **Speed analysis** với running pace calculations
-- **Ball tracking** với hit detection
-- **Player interaction analysis** với proximity detection
-- **Performance comparison** between players
-- **Match statistics** với comprehensive metrics
-
-#### Visualization Features
-- **Individual player heatmaps** showing movement density
-- **Combined trajectory plots** với multiple players
-- **Speed analysis charts** với time-series data
-- **Court zone visualization** với usage percentages
-- **Interactive dashboard** với real-time filtering
-- **Match summary reports** với key metrics
-- **Customizable color schemes** và styling options
-
-#### Technical Features
-- **GPU acceleration support** với CUDA
-- **Memory optimization** cho large video processing
-- **Batch processing capabilities** cho multiple videos
-- **Error handling và recovery** với comprehensive logging
-- **Cross-platform compatibility** (Windows, macOS, Linux)
-- **Virtual environment support** với isolated dependencies
-
-### Configuration
-- Court dimensions: 13.41m × 6.1m (official pickleball standards)
-- Video support: MP4, AVI, MOV, MKV formats
-- Resolution support: 720p to 4K (1080p recommended)
-- Frame rate support: 15-60 FPS (30 FPS optimal)
-
-### System Requirements
-- **Minimum**: Python 3.8+, 8GB RAM, Intel i5/AMD Ryzen 5
-- **Recommended**: Python 3.10+, 16GB RAM, NVIDIA GPU với CUDA
-- **Storage**: 10GB available space (20GB recommended)
-
-### Dependencies
-- **Core**: OpenCV, NumPy, Pandas, PyTorch
-- **ML**: Ultralytics (YOLOv8), Supervision
-- **Visualization**: Matplotlib, Seaborn, Plotly
-- **Utils**: Loguru, PyYAML, tqdm, moviepy
-
-### Performance Benchmarks
-- **Detection**: 30-60 FPS (GPU), 5-15 FPS (CPU)
-- **Tracking**: 100+ FPS (independent of hardware)
-- **Analysis**: 500+ FPS (CPU-bound operations)
-- **Memory usage**: 2-6GB total system memory
-
-### Known Limitations
-- Single video processing tại một thời điểm
-- Manual court calibration required
-- Limited tracking algorithms (simple centroid-based)
-- No real-time processing capabilities
-- No cloud integration
-
-### File Structure
-```
-pickleball_analysis/
-├── README.md                 # Project overview và quick start
-├── requirements.txt          # Python dependencies
-├── main.py                   # Main entry point
-├── demo.py                   # Demo và testing script
-├── setup.py                  # Automated setup script
-├── Makefile                  # Convenient commands
-├── CHANGELOG.md             # This file
-├── config/
-│   ├── config.yaml          # Main configuration
-│   └── court_points.json    # Court calibration data
-├── src/
-│   ├── __init__.py          # Package initialization
-│   ├── utils.py             # Core utilities
-│   ├── court_detection.py   # Court calibration
-│   ├── detection.py         # Object detection
-│   ├── tracking.py          # Multi-object tracking
-│   ├── analysis.py          # Movement analysis
-│   └── visualization.py     # Charts và visualizations
-├── docs/
-│   ├── installation.md      # Installation guide
-│   ├── usage_guide.md       # Usage instructions
-│   └── technical_specs.md   # Technical documentation
-├── output/                  # Generated outputs
-│   ├── tracking_data/       # CSV tracking results
-│   ├── charts/              # Visualizations
-│   ├── reports/             # Analysis reports
-│   └── processed_videos/    # Annotated videos
-└── logs/                    # Application logs
-```
-
-## [0.9.0] - Development Phase
-
-### Research và Prototyping
-- Video analysis requirements gathering
-- Algorithm research và selection
-- Technology stack evaluation
-- Architecture design
-- Proof of concept implementations
-
-## Contact và Support
-
-- **Project**: Pickleball Video Analysis Pipeline
-- **Version**: 1.0.0
-- **Release Date**: October 2, 2025
-- **Author**: AI Assistant
-- **License**: MIT (or your preferred license)
+#### 📊 New Scripts Added
+1. **`corrected_tracking_san4.py`** ⭐ - Main recommended script
+2. **`strict_tracking_san4.py`** - Strict 4-player tracking
+3. **`recalibrate_court.py`** - Court calibration tool
+4. **`check_court_boundary.py`** - Validation tool
+5. **`validate_court_boundary.py`** - Advanced validation
 
 ---
 
-## Notes for Future Versions
+## Version 1.5.0 - October 1, 2025
 
-### Version 1.1.0 (Planned)
-- Advanced tracking algorithms integration
-- Performance optimizations
-- Better ball tracking accuracy
-- Real-time processing capabilities
-- Web interface prototype
+### ✅ Added
+- **`optimized_san4_analysis.py`** - GPU optimized version
+- **`ultra_light_san4.py`** - Lightweight version  
+- **`final_san4_analysis.py`** - Full-featured version
+- Multiple analysis options cho different performance needs
 
-### Version 1.2.0 (Planned)
-- Multi-camera fusion
-- Custom model training pipeline
-- Cloud deployment support
-- Mobile app companion
-- Advanced analytics features
-
-### Version 2.0.0 (Future)
-- Complete architecture redesign
-- Microservices approach
-- Real-time streaming
-- AI-powered insights
-- Commercial features
+### 🛠️ Improvements
+- OpenCV visualization instead of matplotlib
+- 2-window layout (Original + 2D Court)
+- Real-time statistics panel
+- Player trail effects với fade
+- Ball trajectory visualization
 
 ---
 
-**Note**: This is the initial release version. Please report bugs và feature requests để improve the pipeline.
+## Version 1.0.0 - September 30, 2025
+
+### 🎉 Initial Release
+- **`calibrate_san4.py`** - Basic court calibration
+- **`final_san4_analysis.py`** - Initial analysis script
+- Basic YOLO detection cho players và ball
+- Matplotlib-based visualization
+- Court coordinate transformation
+- Simple player tracking
+
+---
+
+## 🔄 Migration Guide
+
+### From Version 1.x to 2.0.0
+
+**IMPORTANT**: Court calibration cần làm lại!
+
+```bash
+# 1. Recalibrate court (REQUIRED)
+python recalibrate_court.py
+
+# 2. Switch to new main script
+python corrected_tracking_san4.py  # Thay vì final_san4_analysis.py
+```
+
+### Key Changes
+- **Court orientation**: Fixed từ vertical net → horizontal net
+- **Player zones**: Changed từ Left/Right → Near/Far camera
+- **Script naming**: `corrected_tracking_san4.py` là main script mới
+
+---
+
+## 🐛 Known Issues
+
+### Fixed in v2.0.0
+- ✅ Court boundary không khớp với thực tế
+- ✅ Net direction sai hướng  
+- ✅ Player tracking ở sân xa camera
+- ✅ Ball không track được qua 2 sân
+
+### Still Working On
+- Font rendering warnings (non-critical)
+- Occasional tracking ID switches
+- Performance optimization cho real-time
+
+---
+
+## 📋 Roadmap
+
+### Version 2.1.0 (Planned)
+- [ ] Auto-court detection (không cần manual calibration)
+- [ ] Shot detection và analysis
+- [ ] Game scoring system
+- [ ] Export tracking data to CSV
+- [ ] Web-based visualization dashboard
+
+### Version 2.2.0 (Future)
+- [ ] Multi-camera support
+- [ ] 3D court reconstruction  
+- [ ] Player pose estimation
+- [ ] Advanced game analytics
+- [ ] Real-time streaming support
+
+---
+
+**Maintainer**: AI Assistant + User Collaboration  
+**Last Updated**: October 2, 2025

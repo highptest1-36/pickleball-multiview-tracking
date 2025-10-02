@@ -1,40 +1,47 @@
-# Core dependencies
-opencv-python>=4.8.0
-numpy>=1.24.0
-pandas>=2.0.0
-matplotlib>=3.7.0
-seaborn>=0.12.0
-plotly>=5.15.0
+# Pickleball Analysis Project Requirements - v2.0.0
 
-# Machine Learning & Computer Vision
-torch>=2.0.0
-torchvision>=0.15.0
-ultralytics>=8.0.0  # YOLOv11x
-supervision>=0.14.0
+# Core AI/ML
+ultralytics>=8.0.0           # YOLOv8 for object detection
+torch>=2.0.0                 # PyTorch for YOLO backend
+torchvision>=0.15.0          # Vision utilities
+
+# Computer Vision  
+opencv-python>=4.8.0         # OpenCV for video processing and visualization
+
+# Scientific Computing
+numpy>=1.24.0                # Numerical computing
+scipy>=1.11.0                # Scientific computing (for distance calculations)
+
+# Visualization
+matplotlib>=3.7.0            # Plotting and visualization
+seaborn>=0.12.0              # Statistical visualization
+
+# Data Handling
+pandas>=2.0.0                # Data manipulation
+PyYAML>=6.0.0                # YAML configuration
+
+# Utilities
+tqdm>=4.65.0                 # Progress bars
+Pillow>=9.4.0,<10.0.0        # Image processing
+loguru>=0.7.0                # Logging
+
+# Video Processing
+moviepy>=1.0.0               # Video processing utilities
 
 # Tracking
-filterpy>=1.4.0
-lap>=0.4.0
+filterpy>=1.4.0              # Kalman filtering
+lap>=0.4.0                   # Linear assignment
 
-# Image processing
-Pillow>=9.4.0,<10.0.0
-scikit-image>=0.21.0
+# Optional: Advanced features
+supervision>=0.14.0          # Computer vision utilities
+scikit-image>=0.21.0         # Image processing
+plotly>=5.15.0               # Interactive plotting
 
-# Data analysis
-scipy>=1.11.0
+# GPU Support Instructions:
+# For CUDA 11.8: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+# For CUDA 12.1: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
-# Configuration
-PyYAML>=6.0.0
-
-# Logging
-loguru>=0.7.0
-
-# Progress bars
-tqdm>=4.65.0
-
-# Video processing
-moviepy>=1.0.0
-
-# Optional: GPU acceleration
-# torch-audio>=2.0.0  # Uncomment if needed
-# torchtext>=0.15.0   # Uncomment if needed
+# Development (Optional)
+# pytest>=6.2.0              # Testing framework  
+# black>=21.0.0               # Code formatting
+# flake8>=3.9.0               # Code linting
