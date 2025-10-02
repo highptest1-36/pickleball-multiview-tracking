@@ -2,82 +2,78 @@
 
 Phân tích video pickleball san4.mp4 với computer vision, AI tracking và court calibration chính xác.
 
-## 🎯 Các Phiên Bản Script (Mới Nhất)
+## 🎯 Script Chính
 
-### 1. `corrected_tracking_san4.py` - ⭐ KHUYẾN NGHỊ MỚI NHẤT ⭐
-- **Tính năng**: Fixed court orientation, proper net direction, accurate 4-player tracking
-- **Performance**: Tối ưu và chính xác nhất
-- **Sử dụng**: Phiên bản chính thức sau khi fix court calibration
-- **Đặc điểm**: 
-  - ✅ Net nằm ngang đúng hướng
-  - ✅ Near/Far camera zones chính xác
-  - ✅ P1,P2 = Near camera | P3,P4 = Far camera
-  - ✅ Ball tracking qua lại 2 sân
-  - ✅ Court boundary visualization trực tiếp trên video
-
-### 2. `strict_tracking_san4.py` - Phiên bản nghiêm ngặt
-- **Tính năng**: STRICT 4-player system, players không được chuyển side
-- **Performance**: Stable tracking với fixed IDs
-- **Sử dụng**: Khi cần tracking nghiêm ngặt không đổi
-- **Đặc điểm**:
-  - 🚫 P1,P2 chỉ ở LEFT side
-  - 🚫 P3,P4 chỉ ở RIGHT side
-  - ✅ Court zones visualization
+### `enhanced_tracking_san4.py` - ⭐ PHIÊN BẢN CHÍNH THỨC ⭐
+- **Model**: YOLO11x (109MB) - High accuracy detection
+- **Tính năng**:
+  - ✅ Stable tracking với distance matching (không nhấp nháy)
+  - ✅ Zone-locked players: P1,P2 ở Sân 1 | P3,P4 ở Sân 2
+  - ✅ Max 2 players mỗi bên sân
+  - ✅ Người chơi KHÔNG nhảy sang sân đối diện
+  - ✅ Ball tracking với trajectory prediction
+  - ✅ Court split theo WIDTH (X-axis): Left/Right sides
+  - ✅ Adaptive confidence thresholds (0.20-0.40)
   - ✅ Player trails với fade effects
+  - ✅ Real-time visualization (~25 FPS)
 
-### 3. `optimized_san4_analysis.py` - Phiên bản tối ưu GPU
-- **Tính năng**: OpenCV visualization, GPU acceleration, 2 cửa sổ riêng biệt
-- **Performance**: Nhanh với GPU support
-- **Sử dụng**: Khi cần performance cao với GPU
-- **Đặc điểm**: 
-  - Video gốc + 2D Court riêng biệt
-  - CUDA support (YOLOv8n)
-  - Skip frames để tăng tốc
+- **Court Calibration**:
+  - 🟨 Yellow polygon: 8 điểm viền sân (user-selected)
+  - 🎾 Net line: 2 điểm đánh dấu lưới
+  - 📐 Homography transform: Image → Court coordinates
 
-### 4. `ultra_light_san4.py` - Phiên bản siêu nhẹ
-- **Tính năng**: Minimal features, maximum performance  
-- **Performance**: Fastest possible
-- **Sử dụng**: Máy yếu hoặc real-time processing
-- **Đặc điểm**:
-  - 480p processing
-  - Skip 3 frames
-  - Simple visualization
+- **Player Colors**:
+  - P1: 🔴 RED (Sân 1)
+  - P2: 🟢 GREEN (Sân 1)
+  - P3: 🔵 BLUE (Sân 2)
+  - P4: 🟡 YELLOW (Sân 2)
 
-## 🛠️ Cài Đặt và Setup
+- **Tracking Logic**:
+  - Mỗi frame: Detect → Classify zone → Distance match → Update
+  - Distance threshold: < 1.5m (match với player ID cũ)
+  - Nếu không match: Gán vào slot trống (theo confidence)
+  - Lost tracking: Deactivate player
 
-### Prerequisites
+## 🛠️ Cài Đặt và Sử Dụng
+
+### Bước 1: Cài đặt dependencies
 ```bash
-pip install ultralytics opencv-python numpy matplotlib torch scipy
+pip install ultralytics opencv-python numpy torch scipy
 ```
 
-### Bước 1: Court Calibration (QUAN TRỌNG!)
+### Bước 2: Court Calibration (LÀM 1 LẦN DUY NHẤT)
+
+**2.1. Chọn 8 điểm viền sân (Yellow Polygon)**
 ```bash
-# Calibrate court cho san4.mp4 (bắt buộc làm đầu tiên)
-python recalibrate_court.py
+python multi_point_selector.py
 ```
-**Hướng dẫn calibration:**
-1. Script sẽ mở video san4.mp4
-2. Click 4 góc sân theo thứ tự: **Top-Left → Top-Right → Bottom-Right → Bottom-Left**
-3. Nhấn **'s'** để save, **'r'** để reset, **'q'** để quit
-4. File `court_calibration_san4.json` sẽ được tạo
+- Click 8 điểm theo viền sân (theo chiều kim đồng hồ)
+- Có thể drag-drop để điều chỉnh
+- Nhấn **'s'** để save → tạo file `court_calibration_san4.json`
 
-### Bước 2: Chạy Analysis Script
-
-**Khuyến nghị (Mới nhất)**:
+**2.2. Đánh dấu lưới (Net Line)**
 ```bash
-python corrected_tracking_san4.py
+python net_selector.py
+```
+- Click 2 điểm trên đường lưới
+- Nhấn **'s'** để save → cập nhật `court_calibration_san4.json`
+
+### Bước 3: Chạy Tracking
+
+**Cách 1: Dùng main.py (Khuyến nghị)**
+```bash
+python main.py
 ```
 
-**Các phiên bản khác**:
+**Cách 2: Chạy trực tiếp**
 ```bash
-# Strict tracking (fixed player sides)
-python strict_tracking_san4.py
+python enhanced_tracking_san4.py
+```
 
-# GPU optimized với 2 cửa sổ
-python optimized_san4_analysis.py
-
-# Ultra light version
-python ultra_light_san4.py
+**Cách 3: Từ bất kỳ đâu**
+```powershell
+Set-Location C:\Users\highp\pickerball\video\pickleball_analysis
+python enhanced_tracking_san4.py
 ```
 
 ## ⚙️ Troubleshooting và Optimization

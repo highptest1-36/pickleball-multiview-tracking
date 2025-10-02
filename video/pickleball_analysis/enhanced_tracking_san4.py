@@ -20,6 +20,21 @@ class EnhancedTrackingSan4:
         self.court_width = self.calibration['court_width']
         self.court_length = self.calibration['court_length']
         
+        # Load yellow polygon points if available
+        self.yellow_polygon = None
+        if 'yellow_polygon' in self.calibration:
+            self.yellow_polygon = np.array(self.calibration['yellow_polygon'], dtype=np.int32)
+            print(f"🟨 Using yellow polygon: {len(self.yellow_polygon)} points")
+        elif 'image_points' in self.calibration:
+            self.yellow_polygon = np.array(self.calibration['image_points'], dtype=np.int32)
+            print(f"🟨 Using image_points: {len(self.yellow_polygon)} points")
+        
+        # Load net line if available
+        self.net_line = None
+        if 'net_line' in self.calibration:
+            self.net_line = np.array(self.calibration['net_line'], dtype=np.int32)
+            print(f"🎾 Using net line: 2 points")
+        
         # Video setup
         self.video_path = r"C:\Users\highp\pickerball\video\data_video\san4.mp4"
         self.cap = cv2.VideoCapture(self.video_path)
@@ -28,20 +43,22 @@ class EnhancedTrackingSan4:
         
         print(f"🎬 Video: {self.total_frames} frames at {self.fps} FPS")
         
-        # YOLO setup
+        # YOLO setup - Using YOLO11x for better detection
         from ultralytics import YOLO
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f"🔧 Using device: {device}")
         
-        self.model = YOLO('yolov8n.pt')
+        self.model = YOLO('yolo11x.pt')  # Upgraded to YOLO11x for better accuracy
         self.model.to(device)
+        print(f"🎯 Model: YOLO11x (high accuracy)")
         
-        # Enhanced 4-player system with confidence tracking
+        # SIMPLE 4-player slots - không có logic phức tạp
+        # Chỉ cần: detect → assign → track
         self.players = {
-            1: {'active': False, 'position': None, 'zone': 'near', 'confidence': 0.0, 'color': (0, 0, 255), 'history': deque(maxlen=30)},
-            2: {'active': False, 'position': None, 'zone': 'near', 'confidence': 0.0, 'color': (0, 100, 255), 'history': deque(maxlen=30)},
-            3: {'active': False, 'position': None, 'zone': 'far', 'confidence': 0.0, 'color': (255, 0, 0), 'history': deque(maxlen=30)},
-            4: {'active': False, 'position': None, 'zone': 'far', 'confidence': 0.0, 'color': (255, 0, 100), 'history': deque(maxlen=30)}
+            1: {'active': False, 'bbox': None, 'court_pos': None, 'zone': None, 'color': (0, 0, 255), 'id': 1},      # RED
+            2: {'active': False, 'bbox': None, 'court_pos': None, 'zone': None, 'color': (0, 255, 0), 'id': 2},      # GREEN  
+            3: {'active': False, 'bbox': None, 'court_pos': None, 'zone': None, 'color': (255, 0, 0), 'id': 3},      # BLUE
+            4: {'active': False, 'bbox': None, 'court_pos': None, 'zone': None, 'color': (0, 255, 255), 'id': 4}     # YELLOW
         }
         
         self.player_tracks = {i: deque(maxlen=150) for i in range(1, 5)}
@@ -52,28 +69,30 @@ class EnhancedTrackingSan4:
         
         self.current_frame = 0
         
-        # Court zones - based on camera perspective
-        self.near_zone = (0, self.court_length * 0.55)  # Near camera (0-55%)
-        self.far_zone = (self.court_length * 0.45, self.court_length)  # Far camera (45-100%)
+        # Court zones - SPLIT BY WIDTH (X-axis), not length!
+        # Left half vs Right half of court
+        self.near_zone = (0, self.court_width * 0.5)  # Left half (0-50% of width)
+        self.far_zone = (self.court_width * 0.5, self.court_width)  # Right half (50-100% of width)
         
-        print(f"🏟️ ENHANCED ZONES:")
-        print(f"   Near Camera: 0 - {self.court_length * 0.55:.1f}m")
-        print(f"   Far Camera: {self.court_length * 0.45:.1f}m - {self.court_length:.1f}m")
+        print(f"🏟️ COURT SPLIT BY WIDTH:")
+        print(f"   Sân 1 (Left/Near) - P1, P2: 0 - {self.court_width * 0.5:.2f}m")
+        print(f"   Sân 2 (Right/Far) - P3, P4: {self.court_width * 0.5:.2f}m - {self.court_width:.2f}m")
         
     def get_adaptive_confidence(self, court_pos):
         """
-        Adaptive confidence threshold based on distance from camera
-        Far = lower threshold, Near = higher threshold
+        Adaptive confidence threshold based on X position (left/right split)
+        Left = higher threshold, Right = lower threshold (far from camera)
         """
-        # Calculate distance from camera (y-coordinate)
-        distance_ratio = court_pos[1] / self.court_length
+        # Calculate distance ratio based on X-coordinate (width)
+        x_ratio = court_pos[0] / self.court_width
         
-        # Adaptive confidence: Far = 0.25, Near = 0.45
-        base_conf = 0.25
-        max_conf = 0.45
-        adaptive_conf = base_conf + (max_conf - base_conf) * (1 - distance_ratio)
+        # Adaptive confidence: Left = 0.40, Right = 0.20 (increased to reduce false positives)
+        # YOLO11x is more accurate, can use lower thresholds but increased for stability
+        base_conf = 0.20
+        max_conf = 0.40
+        adaptive_conf = max_conf - (max_conf - base_conf) * x_ratio
         
-        return max(0.2, min(0.5, adaptive_conf))
+        return max(0.15, min(0.45, adaptive_conf))
     
     def is_on_court(self, court_pos):
         """Check if position is on court"""
@@ -81,13 +100,16 @@ class EnhancedTrackingSan4:
                 0 <= court_pos[1] <= self.court_length)
     
     def get_player_zone(self, court_pos):
-        """Determine player zone with overlap buffer"""
-        y = court_pos[1]
+        """
+        Determine player zone - split by WIDTH (X-axis), not length!
+        Uses <= for near zone to handle edge case when player is exactly on split line
+        """
+        x = court_pos[0]  # Use X coordinate, not Y!
         
-        # Near zone with buffer
-        if y < self.near_zone[1]:
+        # Left half (inclusive of split line at 3.05m)
+        if x <= self.near_zone[1]:
             return 'near'
-        # Far zone
+        # Right half (exclusive, starts after 3.05m)
         else:
             return 'far'
     
@@ -117,7 +139,7 @@ class EnhancedTrackingSan4:
             scale = 1.0
         
         # YOLO detection with LOWER confidence for far objects
-        results = self.model(frame_resized, verbose=False, conf=0.2, iou=0.5)  # Lowered from 0.3
+        results = self.model(frame_resized, verbose=False, conf=0.25, iou=0.5)  # Increased from 0.2 to reduce false positives
         
         persons = []
         balls = []
@@ -143,7 +165,7 @@ class EnhancedTrackingSan4:
                             'size': w * h  # Person size for distance estimation
                         })
                         
-                    elif class_name in ['sports ball', 'ball'] and conf > 0.12:  # Even lower for ball
+                    elif class_name in ['sports ball', 'ball'] and conf > 0.08:  # Very low for ball detection
                         x, y, w, h = box
                         x, y = x / scale, y / scale
                         w, h = w / scale, h / scale
@@ -172,148 +194,142 @@ class EnhancedTrackingSan4:
     
     def assign_players_enhanced(self, detected_persons):
         """
-        Enhanced player assignment with adaptive confidence and better re-ID
+        SUPER SIMPLE LOGIC:
+        1. Detect người → phân loại zone (near/far based on net line)
+        2. Mỗi zone tối đa 2 người
+        3. Cứ detect thấy → vẽ bounding box + tracking
+        4. KHÔNG có re-assignment, KHÔNG có matching phức tạp
         """
         if not detected_persons:
-            # Decay confidence for inactive players
-            for pid in range(1, 5):
-                if self.players[pid]['active']:
-                    self.players[pid]['confidence'] *= 0.95
-                    if self.players[pid]['confidence'] < 0.1:
-                        self.players[pid]['active'] = False
-                        self.players[pid]['position'] = None
             return
         
         # Transform to court coordinates
         person_centers = [p['center'] for p in detected_persons]
         court_positions = self.transform_to_court(person_centers)
         
-        # Filter and enhance detections
+        # Filter valid detections on court
         valid_detections = []
         for person, court_pos in zip(detected_persons, court_positions):
             if self.is_on_court(court_pos):
                 person['court_pos'] = court_pos
                 person['zone'] = self.get_player_zone(court_pos)
-                person['adaptive_conf'] = self.get_adaptive_confidence(court_pos)
-                person['features'] = self.calculate_player_features(person)
-                
-                # Accept if meets adaptive threshold
-                if person['conf'] >= person['adaptive_conf']:
-                    valid_detections.append(person)
+                valid_detections.append(person)
         
         if not valid_detections:
             return
         
         # Separate by zone
-        near_detections = [p for p in valid_detections if p['zone'] == 'near']
-        far_detections = [p for p in valid_detections if p['zone'] == 'far']
+        near_detections = sorted([p for p in valid_detections if p['zone'] == 'near'], 
+                                key=lambda x: x['conf'], reverse=True)[:2]  # Max 2
+        far_detections = sorted([p for p in valid_detections if p['zone'] == 'far'], 
+                               key=lambda x: x['conf'], reverse=True)[:2]  # Max 2
         
-        # Assign near camera players (P1, P2)
-        self.assign_zone_players(near_detections, [1, 2])
+        # Simple assignment - just fill slots
+        self.simple_assign(near_detections, 'near')
+        self.simple_assign(far_detections, 'far')
         
-        # Assign far camera players (P3, P4) with enhanced matching
-        self.assign_zone_players(far_detections, [3, 4])
+        # Debug - Show clear zone assignments
+        if self.current_frame % 30 == 0:
+            p1_status = "✅" if self.players[1]['active'] else "❌"
+            p2_status = "✅" if self.players[2]['active'] else "❌"
+            p3_status = "✅" if self.players[3]['active'] else "❌"
+            p4_status = "✅" if self.players[4]['active'] else "❌"
+            print(f"🏟️ Frame {self.current_frame}: Sân 1: {p1_status}P1 {p2_status}P2 | Sân 2: {p3_status}P3 {p4_status}P4")
     
-    def assign_zone_players(self, detections, player_ids):
+    def simple_assign(self, detections, zone_name):
         """
-        Assign detections to zone players with enhanced matching
+        STABLE TRACKING with zone lock:
+        - Track people continuously within their zone
+        - Use simple distance matching (< 1.5m)
+        - Never jump to opposite side
+        - No flickering, no re-linking
         """
+        # Determine which player IDs belong to this zone
+        if zone_name == 'near':
+            zone_player_ids = [1, 2]  # P1, P2 for near side (Sân 1)
+        else:  # far
+            zone_player_ids = [3, 4]  # P3, P4 for far side (Sân 2)
+        
         if not detections:
+            # No detections - deactivate all players in this zone
+            for pid in zone_player_ids:
+                self.players[pid]['active'] = False
             return
         
         # Get currently active players in this zone
-        active_players = {pid: self.players[pid] for pid in player_ids if self.players[pid]['active']}
+        active_players = [(pid, self.players[pid]) for pid in zone_player_ids 
+                         if self.players[pid]['active']]
         
-        # If no active players, assign first detections
-        if not active_players:
-            for i, detection in enumerate(detections[:2]):
-                pid = player_ids[i]
-                self.assign_player(pid, detection)
-                print(f"✅ Player {pid} activated (zone: {detection['zone']})")
-            return
+        # Simple distance matching for active players
+        assigned_detections = set()
+        assigned_players = set()
         
-        # Enhanced matching with multiple factors
-        if len(active_players) > 0:
-            detection_positions = np.array([d['court_pos'] for d in detections])
-            active_ids = list(active_players.keys())
-            active_positions = np.array([self.players[pid]['position']['court_pos'] for pid in active_ids])
-            
-            # Calculate distance matrix
-            distances = cdist(detection_positions, active_positions)
-            
-            # Enhanced scoring: distance + confidence + size consistency
-            scores = distances.copy()
-            for i, detection in enumerate(detections):
-                for j, pid in enumerate(active_ids):
-                    # Distance penalty
-                    dist_penalty = distances[i, j]
+        if active_players:
+            # Match detections to existing players by distance
+            for pid, player in active_players:
+                if player['court_pos'] is None:
+                    continue
                     
-                    # Confidence bonus
-                    conf_bonus = -detection['conf'] * 2.0
+                best_detection_idx = None
+                best_distance = float('inf')
+                
+                for i, detection in enumerate(detections):
+                    if i in assigned_detections:
+                        continue
                     
-                    # Size consistency bonus (if available)
-                    if len(self.players[pid]['history']) > 0:
-                        avg_size = np.mean([h.get('size', 0) for h in self.players[pid]['history']])
-                        size_diff = abs(detection.get('size', 0) - avg_size) / max(avg_size, 1)
-                        size_penalty = size_diff * 0.5
-                    else:
-                        size_penalty = 0
+                    # Calculate distance
+                    dist = np.linalg.norm(
+                        np.array(detection['court_pos']) - np.array(player['court_pos'])
+                    )
                     
-                    scores[i, j] = dist_penalty + conf_bonus + size_penalty
-            
-            # Greedy assignment
-            used_detections = set()
-            used_players = set()
-            
-            assignments = []
-            for i in range(scores.shape[0]):
-                for j in range(scores.shape[1]):
-                    assignments.append((scores[i, j], i, j))
-            
-            assignments.sort()
-            
-            # Assign with relaxed threshold for far camera
-            max_distance = 2.5 if detections[0]['zone'] == 'far' else 1.8
-            
-            for score, det_idx, player_idx in assignments:
-                if det_idx not in used_detections and player_idx not in used_players:
-                    if distances[det_idx, player_idx] < max_distance:
-                        pid = active_ids[player_idx]
-                        self.assign_player(pid, detections[det_idx])
-                        used_detections.add(det_idx)
-                        used_players.add(player_idx)
-            
-            # Assign remaining detections to inactive slots
-            available_slots = [pid for pid in player_ids if not self.players[pid]['active']]
-            remaining_detections = [detections[i] for i in range(len(detections)) if i not in used_detections]
-            
-            for i, detection in enumerate(remaining_detections[:len(available_slots)]):
-                pid = available_slots[i]
-                self.assign_player(pid, detection)
-                print(f"🔄 Player {pid} re-activated (zone: {detection['zone']})")
+                    # Match if close enough (< 1.5m movement per frame)
+                    if dist < 1.5 and dist < best_distance:
+                        best_distance = dist
+                        best_detection_idx = i
+                
+                # Assign best match
+                if best_detection_idx is not None:
+                    self._update_player(pid, detections[best_detection_idx])
+                    assigned_detections.add(best_detection_idx)
+                    assigned_players.add(pid)
+                else:
+                    # Lost tracking - deactivate
+                    self.players[pid]['active'] = False
+        
+        # Assign remaining detections to inactive slots
+        unassigned_detections = [d for i, d in enumerate(detections) 
+                                if i not in assigned_detections]
+        inactive_players = [pid for pid in zone_player_ids 
+                           if pid not in assigned_players]
+        
+        # Sort by confidence
+        unassigned_detections.sort(key=lambda x: x['conf'], reverse=True)
+        
+        for detection, pid in zip(unassigned_detections, inactive_players):
+            self._update_player(pid, detection)
+            assigned_players.add(pid)
+        
+        # Deactivate remaining inactive players
+        for pid in zone_player_ids:
+            if pid not in assigned_players:
+                self.players[pid]['active'] = False
     
-    def assign_player(self, player_id, detection):
-        """Assign detection to player with confidence tracking"""
-        self.players[player_id]['active'] = True
-        self.players[player_id]['position'] = detection
-        self.players[player_id]['zone'] = detection['zone']
-        self.players[player_id]['confidence'] = detection['conf']
+    def _update_player(self, pid, detection):
+        """Update single player with detection data"""
+        player = self.players[pid]
         
-        # Add to history for feature averaging
-        self.players[player_id]['history'].append({
-            'court_pos': detection['court_pos'],
-            'size': detection.get('size', 0),
-            'conf': detection['conf']
-        })
+        player['active'] = True
+        player['bbox'] = detection['bbox']
+        player['court_pos'] = detection['court_pos']
+        player['zone'] = detection['zone']
+        player['conf'] = detection['conf']
         
-        # Add to tracking history
-        self.player_tracks[player_id].append({
+        # Add to tracking history for trail
+        self.player_tracks[pid].append({
             'frame': self.current_frame,
-            'court_pos': detection['court_pos'],
-            'image_pos': detection['center'],
             'bbox': detection['bbox'],
-            'conf': detection['conf'],
-            'zone': detection['zone']
+            'center': detection['center'],
+            'court_pos': detection['court_pos']
         })
     
     def update_ball_tracking(self, detected_balls):
@@ -358,45 +374,44 @@ class EnhancedTrackingSan4:
                 'conf': best_ball['conf']
             })
             self.last_ball_pos = best_ball['court_pos']
+        else:
+            # Clear last ball position if not detected for 10 frames
+            if len(self.ball_tracks) > 0:
+                last_frame = self.ball_tracks[-1]['frame']
+                if self.current_frame - last_frame > 10:
+                    self.last_ball_pos = None
     
     def draw_court_zones(self, frame):
         """Draw court boundaries and enhanced zones"""
-        # Court corners
-        court_corners = np.array([
-            [0, 0], [self.court_width, 0],
-            [self.court_width, self.court_length], [0, self.court_length]
-        ], dtype=np.float32).reshape(-1, 1, 2)
+        # Draw YELLOW POLYGON if available (the actual user-selected boundary)
+        if self.yellow_polygon is not None and len(self.yellow_polygon) > 0:
+            # Draw yellow polygon (user's exact selection)
+            cv2.polylines(frame, [self.yellow_polygon], True, (0, 255, 255), 4)
+        else:
+            # Fallback: Court corners from homography
+            court_corners = np.array([
+                [0, 0], [self.court_width, 0],
+                [self.court_width, self.court_length], [0, self.court_length]
+            ], dtype=np.float32).reshape(-1, 1, 2)
+            
+            image_corners = cv2.perspectiveTransform(court_corners, np.linalg.inv(self.homography))
+            image_corners = image_corners.reshape(-1, 2).astype(int)
+            
+            # Court boundary (green fallback)
+            cv2.polylines(frame, [image_corners], True, (0, 255, 0), 4)
         
-        image_corners = cv2.perspectiveTransform(court_corners, np.linalg.inv(self.homography))
-        image_corners = image_corners.reshape(-1, 2).astype(int)
+        # Draw NET LINE if available (WHITE thick line)
+        if self.net_line is not None and len(self.net_line) == 2:
+            pt1 = tuple(self.net_line[0])
+            pt2 = tuple(self.net_line[1])
+            cv2.line(frame, pt1, pt2, (255, 255, 255), 6)
         
-        # Court boundary (green)
-        cv2.polylines(frame, [image_corners], True, (0, 255, 0), 4)
-        
-        # Net line (horizontal - white)
-        net_start = np.array([[0, self.court_length/2]], dtype=np.float32).reshape(-1, 1, 2)
-        net_end = np.array([[self.court_width, self.court_length/2]], dtype=np.float32).reshape(-1, 1, 2)
-        
-        net_start_img = cv2.perspectiveTransform(net_start, np.linalg.inv(self.homography))[0][0].astype(int)
-        net_end_img = cv2.perspectiveTransform(net_end, np.linalg.inv(self.homography))[0][0].astype(int)
-        
-        cv2.line(frame, tuple(net_start_img), tuple(net_end_img), (255, 255, 255), 6)
-        
-        # Zone separation line (dotted)
-        zone_y = (self.near_zone[1] + self.far_zone[0]) / 2
-        zone_start = np.array([[0, zone_y]], dtype=np.float32).reshape(-1, 1, 2)
-        zone_end = np.array([[self.court_width, zone_y]], dtype=np.float32).reshape(-1, 1, 2)
-        
-        zone_start_img = cv2.perspectiveTransform(zone_start, np.linalg.inv(self.homography))[0][0].astype(int)
-        zone_end_img = cv2.perspectiveTransform(zone_end, np.linalg.inv(self.homography))[0][0].astype(int)
-        
-        # Dotted line
-        self.draw_dotted_line(frame, tuple(zone_start_img), tuple(zone_end_img), (255, 255, 0), 2, 20)
+        # Zone separation line removed - not needed
         
         # Zone labels
-        cv2.putText(frame, 'NEAR CAMERA (P1,P2)', (30, 40), 
+        cv2.putText(frame, 'LEFT HALF (P1,P2)', (30, 40), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (100, 255, 100), 2)
-        cv2.putText(frame, 'FAR CAMERA (P3,P4)', (frame.shape[1]-280, 40), 
+        cv2.putText(frame, 'RIGHT HALF (P3,P4)', (frame.shape[1]-280, 40), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (100, 100, 255), 2)
         
         return frame
@@ -422,31 +437,32 @@ class EnhancedTrackingSan4:
         # Draw players with enhanced info
         for player_id in range(1, 5):
             if self.players[player_id]['active']:
-                player = self.players[player_id]['position']
+                bbox = self.players[player_id]['bbox']
+                court_pos = self.players[player_id]['court_pos']
                 color = self.players[player_id]['color']
-                conf = self.players[player_id]['confidence']
                 zone = self.players[player_id]['zone']
                 
                 # Bounding box
-                x, y, w, h = player['bbox']
+                x, y, w, h = bbox
                 cv2.rectangle(frame, (int(x), int(y)), (int(x+w), int(y+h)), color, 3)
                 
-                # Center point
-                center = player['center']
-                cv2.circle(frame, (int(center[0]), int(center[1])), 10, color, -1)
-                cv2.circle(frame, (int(center[0]), int(center[1])), 10, (255, 255, 255), 2)
+                # Center point (calculate from bbox)
+                center_x = x + w/2
+                center_y = y + h/2
+                cv2.circle(frame, (int(center_x), int(center_y)), 10, color, -1)
+                cv2.circle(frame, (int(center_x), int(center_y)), 10, (255, 255, 255), 2)
                 
-                # Enhanced label with confidence and zone
-                label = f'P{player_id} {conf:.2f} [{zone}]'
+                # Enhanced label with zone and court position
+                label = f'P{player_id} [{zone}] ({court_pos[0]:.1f},{court_pos[1]:.1f})'
                 cv2.putText(frame, label, 
-                           (int(center[0])+15, int(center[1])-15),
+                           (int(center_x)+15, int(center_y)-15),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
                 
                 # Trail
                 if len(self.player_tracks[player_id]) > 3:
                     trail_points = []
                     for track in list(self.player_tracks[player_id])[-30:]:
-                        trail_points.append(track['image_pos'])
+                        trail_points.append(track['center'])  # Use 'center' from simple_assign
                     
                     for i in range(1, len(trail_points)):
                         alpha = i / len(trail_points)
@@ -455,32 +471,37 @@ class EnhancedTrackingSan4:
                         pt2 = (int(trail_points[i][0]), int(trail_points[i][1]))
                         cv2.line(frame, pt1, pt2, trail_color, 3)
         
-        # Draw ball
+        # Draw ball - ONLY if detected in recent frames (within 5 frames)
         if len(self.ball_tracks) > 0:
             current_ball = self.ball_tracks[-1]
-            center = current_ball['image_pos']
-            bbox = current_ball['bbox']
+            frame_gap = self.current_frame - current_ball['frame']
             
-            x, y, w, h = bbox
-            cv2.rectangle(frame, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 255), 2)
-            
-            cv2.circle(frame, (int(center[0]), int(center[1])), 8, (0, 255, 255), -1)
-            cv2.circle(frame, (int(center[0]), int(center[1])), 8, (0, 0, 0), 2)
-            
-            cv2.putText(frame, f'BALL ({current_ball["conf"]:.2f})', 
-                       (int(center[0])+12, int(center[1])-12),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
-            
-            # Ball trail
-            if len(self.ball_tracks) > 3:
-                ball_trail = []
-                for track in list(self.ball_tracks)[-25:]:
-                    ball_trail.append(track['image_pos'])
+            # ONLY show if detected within last 5 frames
+            if frame_gap <= 5:
+                center = current_ball['image_pos']
+                bbox = current_ball['bbox']
                 
-                for i in range(1, len(ball_trail)):
-                    pt1 = (int(ball_trail[i-1][0]), int(ball_trail[i-1][1]))
-                    pt2 = (int(ball_trail[i][0]), int(ball_trail[i][1]))
-                    cv2.line(frame, pt1, pt2, (0, 255, 255), 2)
+                x, y, w, h = bbox
+                cv2.rectangle(frame, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 255), 2)
+                
+                cv2.circle(frame, (int(center[0]), int(center[1])), 8, (0, 255, 255), -1)
+                cv2.circle(frame, (int(center[0]), int(center[1])), 8, (0, 0, 0), 2)
+                
+                cv2.putText(frame, f'BALL ({current_ball["conf"]:.2f})', 
+                           (int(center[0])+12, int(center[1])-12),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+                
+                # Ball trail - only recent tracks
+                if len(self.ball_tracks) > 3:
+                    ball_trail = []
+                    for track in list(self.ball_tracks)[-15:]:
+                        if self.current_frame - track['frame'] <= 15:
+                            ball_trail.append(track['image_pos'])
+                    
+                    for i in range(1, len(ball_trail)):
+                        pt1 = (int(ball_trail[i-1][0]), int(ball_trail[i-1][1]))
+                        pt2 = (int(ball_trail[i][0]), int(ball_trail[i][1]))
+                        cv2.line(frame, pt1, pt2, (0, 255, 255), 2)
         
         return frame
     
